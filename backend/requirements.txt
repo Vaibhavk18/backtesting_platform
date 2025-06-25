@@ -1,0 +1,9 @@
+fastapi==0.111.0
+uvicorn==0.30.1
+ccxt==4.2.99
+pandas==2.2.2
+python-dotenv==1.0.1
+supabase==2.3.5
+httpx==0.25.1
+asyncpg==0.29.0
+pydantic-settings
