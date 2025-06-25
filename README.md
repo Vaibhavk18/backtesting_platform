@@ -51,37 +51,7 @@ It is built with FastAPI, Supabase, and pandas/numpy, and supports plug-and-play
    pytest
    ```
 
-## API Endpoints
 
-- `POST /api/v1/backtest/{strategy_id}`: Run a backtest for a given strategy and OHLCV data.
-- `GET /api/v1/metrics/{strategy_id}`: Fetch performance metrics for a strategy.
-- (See FastAPI docs at `/docs` when server is running.)
 
-## Project Structure
 
-```
-Backtesting_Platform/
-  backend/
-    app/
-      api/v1/
-      analytics/
-      db/
-      schemas/
-      services/
-      utils/
-      main.py
-      ...
-    tests/
-    requirements.txt
-  venv/
-```
 
-## Notes
-
-- The backend is designed to be extended with new indicators, risk models, and analytics.
-- For production, configure logging, secrets, and database credentials securely.
-- Frontend integration is planned for the next phase.
-
----
-
-You can update this documentation as you add the frontend and more features. 
