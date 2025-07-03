@@ -135,14 +135,17 @@ A full-stack platform for building, backtesting, and analyzing quantitative trad
 ---
 
 ## Future Improvements
+- Better UI support
 
-- Add more technical indicators and risk models.
-- Implement real-time streaming data (WebSocket) for live trading.
-- Enhance the strategy builder with more advanced logic and validation.
-- Add user authentication and multi-user support.
-- Improve error handling and user feedback in the UI.
-- Add export/import for strategies and results.
-- Expand test coverage and add E2E tests.
+- Custom indicator support
+
+- Strategy optimization
+
+- Cross-exchange arbitrage analysis
+
+- Advanced risk modeling
+
+- Portfolio rebalancing logic
 
 ---
 
