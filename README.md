@@ -1,10 +1,3 @@
-# Project Note
-
-At one point during development, all core features—including strategy creation, saving, loading, and data visualization—were working as intended. However, due to my limited experience with advanced frontend concepts in React, I encountered issues that prevented the "Run Backtest" button from appearing and running as expected in the UI. Despite this, all other data (strategies, performance, and market data) loads and displays correctly, and the backend remains fully functional.
-
-This issue is isolated to the frontend integration of the backtest trigger and will be addressed as a priority in future improvements. I am committed to learning more about advanced React patterns and state management to resolve this and further enhance the platform.
-
----
 
 # Backtesting & Analytics Platform
 
