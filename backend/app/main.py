@@ -3,7 +3,8 @@ from fastapi.responses import JSONResponse
 import logging
 import traceback
 import os
-from app.api.v1 import data_routes, websocket_routes, metrics_routes, backtest_routes
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1 import websocket_routes, metrics_routes, backtest_routes, strategy_routes, okx_routes
 
 app = FastAPI(
     title="Backtesting Platform API",
@@ -11,10 +12,21 @@ app = FastAPI(
     description="Backend API for full-stack backtesting platform"
 )
 
-app.include_router(data_routes.router, prefix="/api/v1")
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000","http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(websocket_routes.router, prefix="/api/v1")
 app.include_router(metrics_routes.router, prefix="/api/v1")
 app.include_router(backtest_routes.router, prefix="/api/v1")
+app.include_router(strategy_routes.router, prefix="/api/v1")
+app.include_router(okx_routes.router, prefix="/api/v1/okx")
+app.include_router(okx_routes.router, prefix="/api/v1")
 
 # Configure file-based logging with absolute path
 log_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app.log'))
