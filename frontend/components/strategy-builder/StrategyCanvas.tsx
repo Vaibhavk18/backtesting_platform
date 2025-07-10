@@ -188,8 +188,17 @@ const StrategyCanvas = () => {
       case 'comparison':
         return { inputs: ['left', 'right'], outputs: ['result'], properties: {} };
       case 'market-order':
+        return {
+          inputs: ['signal'],
+          outputs: ['order'],
+          properties: { side: 'buy', quantity: 1, slippage: 0.001, commission: 0.0005 }
+        };
       case 'limit-order':
-        return { inputs: ['signal'], outputs: ['order'], properties: {} };
+        return {
+          inputs: ['signal'],
+          outputs: ['order'],
+          properties: { side: 'buy', quantity: 1, price: 0, slippage: 0.001, commission: 0.0005 }
+        };
       case 'stop-loss':
         return { inputs: ['order'], outputs: ['protectedOrder'], properties: { type: 'percentage', value: 2 } };
       case 'position-sizing':

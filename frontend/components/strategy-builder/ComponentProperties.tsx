@@ -138,6 +138,23 @@ export default function ComponentProperties({ component, isOpen, onClose }: Comp
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="market_type">Market Type</Label>
+              <Select
+                value={properties.market_type || "spot"}
+                onValueChange={(value) => setProperties({ ...properties, market_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="spot">Spot</SelectItem>
+                  <SelectItem value="perp">Perp</SelectItem>
+                  <SelectItem value="future">Future</SelectItem>
+                  <SelectItem value="options">Options</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )
 
@@ -172,6 +189,111 @@ export default function ComponentProperties({ component, isOpen, onClose }: Comp
             </div>
           </div>
         )
+
+      case "market-order":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="side">Side</Label>
+              <Select value={properties.side || "buy"}
+                onValueChange={value => setProperties({ ...properties, side: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="buy">Buy</SelectItem>
+                  <SelectItem value="sell">Sell</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input id="quantity" type="number" value={properties.quantity || 1}
+                onChange={e => setProperties({ ...properties, quantity: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label htmlFor="slippage">Slippage (%)</Label>
+              <Input id="slippage" type="number" step="0.0001"
+                value={properties.slippage || 0.001}
+                onChange={e => setProperties({ ...properties, slippage: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label htmlFor="commission">Commission (%)</Label>
+              <Input id="commission" type="number" step="0.0001"
+                value={properties.commission || 0.0005}
+                onChange={e => setProperties({ ...properties, commission: Number(e.target.value) })} />
+            </div>
+          </div>
+        );
+      case "limit-order":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="side">Side</Label>
+              <Select value={properties.side || "buy"}
+                onValueChange={value => setProperties({ ...properties, side: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="buy">Buy</SelectItem>
+                  <SelectItem value="sell">Sell</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input id="quantity" type="number" value={properties.quantity || 1}
+                onChange={e => setProperties({ ...properties, quantity: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label htmlFor="price">Price</Label>
+              <Input id="price" type="number" value={properties.price || 0}
+                onChange={e => setProperties({ ...properties, price: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label htmlFor="slippage">Slippage (%)</Label>
+              <Input id="slippage" type="number" step="0.0001"
+                value={properties.slippage || 0.001}
+                onChange={e => setProperties({ ...properties, slippage: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label htmlFor="commission">Commission (%)</Label>
+              <Input id="commission" type="number" step="0.0001"
+                value={properties.commission || 0.0005}
+                onChange={e => setProperties({ ...properties, commission: Number(e.target.value) })} />
+            </div>
+          </div>
+        );
+
+      case "macd-indicator":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="fast_period">Fast Period</Label>
+              <Input
+                id="fast_period"
+                type="number"
+                value={properties.fast_period || 12}
+                onChange={e => setProperties({ ...properties, fast_period: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="slow_period">Slow Period</Label>
+              <Input
+                id="slow_period"
+                type="number"
+                value={properties.slow_period || 26}
+                onChange={e => setProperties({ ...properties, slow_period: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="signal_period">Signal Period</Label>
+              <Input
+                id="signal_period"
+                type="number"
+                value={properties.signal_period || 9}
+                onChange={e => setProperties({ ...properties, signal_period: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+        );
 
       case "and-logic":
       case "or-logic":

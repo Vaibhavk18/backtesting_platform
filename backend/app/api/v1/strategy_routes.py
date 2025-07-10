@@ -13,12 +13,25 @@ async def get_strategies():
 
 @router.post("/strategies", tags=["Strategy"])
 async def save_strategy(strategy: StrategySchema):
-    # Save the whole strategy.data to the data column, and also components/connections if present
+    # Serialize components and connections to dicts if they are Pydantic models
+    def serialize_list(items):
+        if items is None:
+            return None
+        return [item.dict() if hasattr(item, 'dict') else item for item in items]
+
     result = supabase.table("strategies").upsert({
         "name": strategy.name,
+        "description": getattr(strategy, "description", None),
+        "market_type": getattr(strategy, "market_type", None),
+        "order_type": getattr(strategy, "order_type", None),
+        "allocation": getattr(strategy, "allocation", None),
+        "slippage": getattr(strategy, "slippage", None),
+        "fee": getattr(strategy, "fee", None),
+        "stop_loss": getattr(strategy, "stop_loss", None),
+        "take_profit": getattr(strategy, "take_profit", None),
         "data": strategy.data,
-        "components": strategy.components,
-        "connections": strategy.connections
+        "components": serialize_list(strategy.components),
+        "connections": serialize_list(strategy.connections)
     }).execute()
     return result
 

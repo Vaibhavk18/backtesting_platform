@@ -17,9 +17,14 @@ class LogicNode(BaseModel):
 
 LogicNode.model_rebuild()
 
+class StrategyComponent(BaseModel):
+    id: str
+    type: str
+    properties: Dict[str, Any] = {}
+
 class StrategySchema(BaseModel):
     name: str
-    data: Dict[str, Any]  # Accepts the full frontend strategy object
+    data: Dict[str, Any]  
     indicators: List[IndicatorConfig]
     entry: LogicNode
     exit: LogicNode
@@ -30,5 +35,5 @@ class StrategySchema(BaseModel):
     fee: float = Field(0.0, description="Fee in basis points (bps)")
     stop_loss: Optional[float] = Field(None, description="Stop loss as a percentage (e.g. 0.05 for 5%)")
     take_profit: Optional[float] = Field(None, description="Take profit as a percentage (e.g. 0.1 for 10%)")
-    components: Optional[dict] = Field(None, description="Node-based components for the strategy")
-    connections: Optional[dict] = Field(None, description="Node-based connections for the strategy")
+    components: Optional[List[StrategyComponent]] = Field(None, description="Node-based components for the strategy")
+    connections: Optional[List[dict]] = Field(None, description="Node-based connections for the strategy")

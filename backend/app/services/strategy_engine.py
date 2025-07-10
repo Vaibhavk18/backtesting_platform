@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Optional 
 from app.schemas.strategy_schemas import LogicNode, Condition, IndicatorConfig
 from app.services.indicators import ema, rsi, macd
 import logging
@@ -15,10 +15,10 @@ class StrategyEngine:
         }
         logger.info("[StrategyEngine] Initialized with indicators: EMA, RSI, MACD")
     
-    def calculate_indicators(self, data: pd.DataFrame, indicator_configs: List[IndicatorConfig]) -> Dict[str, pd.Series]:
-        """Calculate all indicators for the given data"""
+    def calculate_indicators(self, data: pd.DataFrame, indicator_configs: List[IndicatorConfig], components: Optional[List[Any]] = None) -> Dict[str, pd.Series]:
+        """Calculate all indicators for the given data, including node-based MACD if present"""
         results = {}
-        
+        # Standard indicator configs
         for config in indicator_configs:
             try:
                 if config.type == "EMA":
@@ -40,7 +40,19 @@ class StrategyEngine:
                     logger.info(f"[StrategyEngine] Calculated MACD (fast={fast}, slow={slow}, signal={signal})")
             except Exception as e:
                 logger.error(f"[StrategyEngine] Error calculating indicator {config.type}: {e}", exc_info=True)
-        
+        # Node-based MACD components
+        if components:
+            for comp in components:
+                if comp.type == "macd-indicator":
+                    props = comp.properties
+                    fast = props.get("fast_period", 12)
+                    slow = props.get("slow_period", 26)
+                    signal = props.get("signal_period", 9)
+                    macd_line, signal_line, histogram = self.indicators["MACD"](data["close"], fast, slow, signal)
+                    results[f"MACD_{fast}_{slow}_{signal}"] = macd_line
+                    results[f"MACD_SIGNAL_{fast}_{slow}_{signal}"] = signal_line
+                    results[f"MACD_HISTOGRAM_{fast}_{slow}_{signal}"] = histogram
+                    logger.info(f"[StrategyEngine] Calculated node-based MACD (fast={fast}, slow={slow}, signal={signal})")
         return results
     
     def evaluate_condition(self, condition: Condition, indicators: Dict[str, pd.Series], index: int) -> bool:
@@ -87,12 +99,12 @@ class StrategyEngine:
         return False
     
     def generate_signals(self, data: pd.DataFrame, entry_logic: LogicNode, exit_logic: LogicNode, 
-                        indicator_configs: List[IndicatorConfig]) -> pd.Series:
+                        indicator_configs: List[IndicatorConfig], components: Optional[List[Any]] = None) -> pd.Series:
         """Generate buy/sell signals based on entry and exit logic"""
         
         logger.info("[StrategyEngine] Generating signals...")
         try:
-            indicators = self.calculate_indicators(data, indicator_configs)
+            indicators = self.calculate_indicators(data, indicator_configs, components)
             
             signals = pd.Series(index=data.index, data=0) 
             

@@ -169,11 +169,19 @@ export const api = {
 
   // Backtesting
   async runBacktest(strategy: any, parameters: any): Promise<ApiResponse<any>> {
-    const res = await fetch(`${BASE_URL}/api/strategies/backtest`, {
+    // Extract ohlcv_data and user_id from parameters
+    const { ohlcv_data, user_id, ...rest } = parameters || {};
+    const strategyId = strategy.id || "default";
+    const res = await fetch(`${BASE_URL}/api/backtest/${strategyId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategy, parameters }),
-    })
+      body: JSON.stringify({
+        strategy,
+        ohlcv_data,
+        user_id,
+        ...rest
+      }),
+    });
     return handleResponse<any>(res)
   },
 

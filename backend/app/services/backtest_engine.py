@@ -99,72 +99,165 @@ class BacktestEngine:
     def run_backtest(self, data: pd.DataFrame, strategy: StrategySchema) -> Any:
         logger.info(f"[BacktestEngine] Running backtest for strategy={strategy.name}")
         try:
-            signals = self.strategy_engine.generate_signals(
-                data, strategy.entry, strategy.exit, strategy.indicators
-            )
-            
-            capital = self.initial_capital
-            position = 0.0
-            trades = []
-            equity_curve = []
-            funding_payments = []
-            config = self.get_market_config(strategy.market_type)
-            entry_price = None
-            
-            for i in range(len(data)):
-                current_price = data.iloc[i]["close"]
-                signal = signals.iloc[i]
+            # If node-based components are present, use them for order execution
+            if strategy.components:
+                capital = self.initial_capital
+                position = 0.0
+                trades = []
+                equity_curve = []
+                entry_price = None
+                for i in range(len(data)):
+                    current_price = data.iloc[i]["close"]
+                    # Find order nodes to execute at this step
+                    for comp in strategy.components:
+                        if comp.type in ["market-order", "limit-order"]:
+                            props = comp.properties
+                            side = props.get("side", "buy")
+                            quantity = props.get("quantity", 1)
+                            price = props.get("price", current_price)
+                            slippage = props.get("slippage", 0.0)
+                            commission = props.get("commission", 0.0)
+                            filled = False
+                            fill_price = current_price
+                            if comp.type == "market-order":
+                                fill_price = self.apply_slippage_and_fees(current_price, side == "buy", slippage * 100, commission * 100)
+                                filled = True
+                            elif comp.type == "limit-order":
+                                if (side == "buy" and current_price <= price) or (side == "sell" and current_price >= price):
+                                    fill_price = price * (1 + commission)  # No slippage for limit order
+                                    filled = True
+                            if filled:
+                                cost = fill_price * quantity
+                                if side == "buy" and cost <= capital:
+                                    position += quantity
+                                    capital -= cost
+                                    entry_price = fill_price
+                                    trades.append({
+                                        "timestamp": data.index[i],
+                                        "type": "BUY" if side == "buy" else "SELL",
+                                        "price": fill_price,
+                                        "quantity": quantity,
+                                        "cost": cost,
+                                        "order_type": comp.type
+                                    })
+                                elif side == "sell" and position >= quantity:
+                                    capital += fill_price * quantity
+                                    position -= quantity
+                                    trades.append({
+                                        "timestamp": data.index[i],
+                                        "type": "SELL",
+                                        "price": fill_price,
+                                        "quantity": quantity,
+                                        "revenue": fill_price * quantity,
+                                        "order_type": comp.type
+                                    })
+                    position_value = position * current_price
+                    current_equity = capital + position_value
+                    equity_curve.append(current_equity)
+                equity_series = pd.Series(equity_curve, index=data.index)
+                returns = equity_series.pct_change().dropna()
+                total_return = (equity_series.iloc[-1] - self.initial_capital) / self.initial_capital
+                sharpe_ratio = returns.mean() / returns.std() * np.sqrt(252) if returns.std() > 0 else 0
+                max_drawdown = (equity_series / equity_series.expanding().max() - 1).min()
+                def convert_trade(trade):
+                    return {k: (float(v) if isinstance(v, np.floating) else int(v) if isinstance(v, np.integer) else v) for k, v in trade.items()}
+                logger.info(f"[BacktestEngine] Node-based backtest complete for strategy={strategy.name}")
+                results = {
+                    "initial_capital": self.initial_capital,
+                    "final_capital": equity_series.iloc[-1],
+                    "total_return": total_return,
+                    "sharpe_ratio": sharpe_ratio,
+                    "max_drawdown": max_drawdown,
+                    "trades": [convert_trade(t) for t in trades],
+                    "equity_curve": equity_series,
+                    "returns": returns,
+                }
+                return self.to_serializable(results)
+            else:
+                signals = self.strategy_engine.generate_signals(
+                    data, strategy.entry, strategy.exit, strategy.indicators, strategy.components or []
+                )
                 
-                if strategy.market_type == "perp" and position != 0:
-                    funding_payment = self.apply_funding_rate(position * current_price, strategy.market_type)
-                    capital -= funding_payment
-                    funding_payments.append({
-                        "timestamp": data.index[i],
-                        "amount": funding_payment
-                    })
+                capital = self.initial_capital
+                position = 0.0
+                trades = []
+                equity_curve = []
+                funding_payments = []
+                config = self.get_market_config(strategy.market_type)
+                entry_price = None
                 
-                if signal == 1 and position == 0:
-                    quantity = self.calculate_position_size(
-                        current_price, strategy.allocation, capital, strategy.market_type
-                    )
+                for i in range(len(data)):
+                    current_price = data.iloc[i]["close"]
+                    signal = signals.iloc[i]
                     
-                    position_value = quantity * current_price
-                    required_margin = self.calculate_margin_requirement(position_value, strategy.market_type)
-                    
-                    actual_price, cost = self.execute_order(
-                        strategy.order_type, current_price, quantity,
-                        strategy.slippage, strategy.fee, strategy.market_type
-                    )
-                    
-                    if cost <= capital:
-                        position = quantity
-                        capital -= cost
-                        entry_price = actual_price
-                        trades.append({
+                    if strategy.market_type == "perp" and position != 0:
+                        funding_payment = self.apply_funding_rate(position * current_price, strategy.market_type)
+                        capital -= funding_payment
+                        funding_payments.append({
                             "timestamp": data.index[i],
-                            "type": "BUY",
-                            "price": actual_price,
-                            "quantity": quantity,
-                            "cost": cost,
-                            "market_type": strategy.market_type
+                            "amount": funding_payment
                         })
-                
-                elif position > 0 and entry_price is not None:
-                    sl_triggered = False
-                    tp_triggered = False
-                    if strategy.stop_loss is not None and current_price <= entry_price * (1 - strategy.stop_loss):
-                        sl_triggered = True
-                    if strategy.take_profit is not None and current_price >= entry_price * (1 + strategy.take_profit):
-                        tp_triggered = True
-                    if sl_triggered or tp_triggered:
+                    
+                    if signal == 1 and position == 0:
+                        quantity = self.calculate_position_size(
+                            current_price, strategy.allocation, capital, strategy.market_type
+                        )
+                        
+                        position_value = quantity * current_price
+                        required_margin = self.calculate_margin_requirement(position_value, strategy.market_type)
+                        
+                        actual_price, cost = self.execute_order(
+                            strategy.order_type, current_price, quantity,
+                            strategy.slippage, strategy.fee, strategy.market_type
+                        )
+                        
+                        if cost <= capital:
+                            position = quantity
+                            capital -= cost
+                            entry_price = actual_price
+                            trades.append({
+                                "timestamp": data.index[i],
+                                "type": "BUY",
+                                "price": actual_price,
+                                "quantity": quantity,
+                                "cost": cost,
+                                "market_type": strategy.market_type
+                            })
+                    
+                    elif position > 0 and entry_price is not None:
+                        sl_triggered = False
+                        tp_triggered = False
+                        if strategy.stop_loss is not None and current_price <= entry_price * (1 - strategy.stop_loss):
+                            sl_triggered = True
+                        if strategy.take_profit is not None and current_price >= entry_price * (1 + strategy.take_profit):
+                            tp_triggered = True
+                        if sl_triggered or tp_triggered:
+                            actual_price, revenue = self.execute_order(
+                                strategy.order_type, current_price, position,
+                                strategy.slippage, strategy.fee, strategy.market_type
+                            )
+                            capital += revenue
+                            trades.append({
+                                "timestamp": data.index[i],
+                                "type": "SELL_SL" if sl_triggered else "SELL_TP",
+                                "price": actual_price,
+                                "quantity": position,
+                                "revenue": revenue,
+                                "market_type": strategy.market_type
+                            })
+                            position = 0.0
+                            entry_price = None
+                    
+                    elif signal == -1 and position > 0:
                         actual_price, revenue = self.execute_order(
                             strategy.order_type, current_price, position,
                             strategy.slippage, strategy.fee, strategy.market_type
                         )
+                        
                         capital += revenue
                         trades.append({
                             "timestamp": data.index[i],
-                            "type": "SELL_SL" if sl_triggered else "SELL_TP",
+                            "type": "SELL",
                             "price": actual_price,
                             "quantity": position,
                             "revenue": revenue,
@@ -172,57 +265,39 @@ class BacktestEngine:
                         })
                         position = 0.0
                         entry_price = None
-                
-                elif signal == -1 and position > 0:
-                    actual_price, revenue = self.execute_order(
-                        strategy.order_type, current_price, position,
-                        strategy.slippage, strategy.fee, strategy.market_type
-                    )
                     
-                    capital += revenue
-                    trades.append({
-                        "timestamp": data.index[i],
-                        "type": "SELL",
-                        "price": actual_price,
-                        "quantity": position,
-                        "revenue": revenue,
-                        "market_type": strategy.market_type
-                    })
-                    position = 0.0
-                    entry_price = None
+                    position_value = position * current_price
+                    current_equity = capital + position_value
+                    equity_curve.append(current_equity)
                 
-                position_value = position * current_price
-                current_equity = capital + position_value
-                equity_curve.append(current_equity)
-            
-            equity_series = pd.Series(equity_curve, index=data.index)
-            returns = equity_series.pct_change().dropna()
-            
-            total_return = (equity_series.iloc[-1] - self.initial_capital) / self.initial_capital
-            sharpe_ratio = returns.mean() / returns.std() * np.sqrt(252) if returns.std() > 0 else 0
-            max_drawdown = (equity_series / equity_series.expanding().max() - 1).min()
-            
-            def convert_trade(trade):
-                return {k: (float(v) if isinstance(v, np.floating) else
-                            int(v) if isinstance(v, np.integer) else
-                            v)
-                        for k, v in trade.items()}
-            
-            logger.info(f"[BacktestEngine] Backtest complete for strategy={strategy.name}")
-            results = {
-                "initial_capital": self.initial_capital,
-                "final_capital": equity_series.iloc[-1],
-                "total_return": total_return,
-                "sharpe_ratio": sharpe_ratio,
-                "max_drawdown": max_drawdown,
-                "trades": [convert_trade(t) for t in trades],
-                "equity_curve": equity_series,
-                "returns": returns,
-                "signals": signals,
-                "funding_payments": funding_payments,
-                "market_type": strategy.market_type
-            }
-            return self.to_serializable(results)
+                equity_series = pd.Series(equity_curve, index=data.index)
+                returns = equity_series.pct_change().dropna()
+                
+                total_return = (equity_series.iloc[-1] - self.initial_capital) / self.initial_capital
+                sharpe_ratio = returns.mean() / returns.std() * np.sqrt(252) if returns.std() > 0 else 0
+                max_drawdown = (equity_series / equity_series.expanding().max() - 1).min()
+                
+                def convert_trade(trade):
+                    return {k: (float(v) if isinstance(v, np.floating) else
+                                int(v) if isinstance(v, np.integer) else
+                                v)
+                            for k, v in trade.items()}
+                
+                logger.info(f"[BacktestEngine] Backtest complete for strategy={strategy.name}")
+                results = {
+                    "initial_capital": self.initial_capital,
+                    "final_capital": equity_series.iloc[-1],
+                    "total_return": total_return,
+                    "sharpe_ratio": sharpe_ratio,
+                    "max_drawdown": max_drawdown,
+                    "trades": [convert_trade(t) for t in trades],
+                    "equity_curve": equity_series,
+                    "returns": returns,
+                    "signals": signals,
+                    "funding_payments": funding_payments,
+                    "market_type": strategy.market_type
+                }
+                return self.to_serializable(results)
         except Exception as e:
             logger.error(f"[BacktestEngine] Error during backtest: {e}", exc_info=True)
             raise

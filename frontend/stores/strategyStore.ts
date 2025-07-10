@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import type { Strategy, StrategyComponent, StrategyConnection } from "@/types/strategy"
 import { api } from '@/lib/api'
-import { v4 as uuidv4 } from 'uuid'
+import { v4 as uuidv4, validate as validateUuid } from 'uuid'
 
 interface StrategyStore {
   strategy: Strategy
@@ -41,7 +41,7 @@ function deepCloneStrategy(strategy: Strategy): Strategy {
 }
 
 // Helper to build backend-compatible payload
-function buildBackendStrategyPayload(strategy: Strategy) {
+export function buildBackendStrategyPayload(strategy: Strategy) {
   return {
     name: strategy.name,
     data: {
@@ -49,27 +49,31 @@ function buildBackendStrategyPayload(strategy: Strategy) {
       isValid: strategy.isValid,
       createdAt: strategy.createdAt,
       updatedAt: strategy.updatedAt,
-      // Add any other frontend-specific fields here
     },
-    indicators: [], // TODO: Populate from components if needed
-    entry: {},      // TODO: Populate from components if needed
-    exit: {},       // TODO: Populate from components if needed
-    order_type: "market", // TODO: Set from UI or default
-    market_type: "spot",  // TODO: Set from UI or default
-    allocation: 1.0,       // TODO: Set from UI or default
-    slippage: 0.0,         // TODO: Set from UI or default
-    fee: 0.0,              // TODO: Set from UI or default
-    stop_loss: null,       // TODO: Set from UI or default
-    take_profit: null,     // TODO: Set from UI or default
-    components: { nodes: strategy.components },
-    connections: { edges: strategy.connections },
+    indicators: [], // Default empty array for backend schema
+    entry: {},      // Default empty object for backend schema
+    exit: {},       // Default empty object for backend schema
+    order_type: "market", // Default value for backend schema
+    market_type: "spot",  // Default value for backend schema
+    allocation: 1.0,      // Default value for backend schema
+    slippage: 0.0,        // Default value for backend schema
+    fee: 0.0,             // Default value for backend schema
+    stop_loss: null,      // Default value for backend schema
+    take_profit: null,    // Default value for backend schema
+    components: (strategy.components || []).map(c => ({ ...c })),
+    connections: (strategy.connections || []).map(c => ({ ...c })),
   };
 }
 
 // Helper to convert backend payload to frontend Strategy type
 function buildFrontendStrategyFromBackend(backend: any): Strategy {
+  let id = backend.data?.id || '';
+  // If id is missing or not a valid UUID, generate a new one
+  if (!id || !validateUuid(id)) {
+    id = uuidv4();
+  }
   return {
-    id: backend.data?.id || '',
+    id,
     name: backend.name || '',
     components: backend.components?.nodes || [],
     connections: backend.connections?.edges || [],
@@ -252,14 +256,19 @@ export const useStrategyStore = create<StrategyStore>((set, get) => ({
     set({ validationErrors: errors });
   },
 
-  setStrategy: (strategy) => {
-    set({
-      strategy: deepCloneStrategy(strategy),
+  setStrategy: (strategy: Strategy) => {
+    // Ensure the strategy has a valid UUID
+    let id = strategy.id;
+    if (!id || !validateUuid(id)) {
+      id = uuidv4();
+    }
+    set((state) => ({
+      strategy: { ...strategy, id },
+      selectedComponentId: null,
       history: [],
       future: [],
-      selectedComponentId: null,
-    });
-    get().validateStrategy();
+      validationErrors: {},
+    }));
   },
 
   saveStrategy: async () => {

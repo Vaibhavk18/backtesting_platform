@@ -27,6 +27,14 @@ export interface Strategy {
   isValid: boolean
   createdAt: Date
   updatedAt: Date
+  description?: string
+  market_type?: string
+  order_type?: string
+  allocation?: number
+  slippage?: number
+  fee?: number
+  stop_loss?: number
+  take_profit?: number
 }
 
 export interface BacktestResult {
